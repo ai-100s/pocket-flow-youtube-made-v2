@@ -4,6 +4,8 @@ from pocketflow import Node, BatchNode, BatchFlow # Assuming pocketflow.py is in
 from utils.youtube_processor import get_youtube_video_info
 from utils.call_llm import call_llm
 from utils.html_generator import generate_html_report
+import os
+import re
 
 class ProcessYouTubeURLNode(Node):
     """Process YouTube URL to extract video information."""
@@ -277,7 +279,38 @@ class GenerateHTMLNode(Node):
 
     def post(self, shared, prep_res, exec_res):
         shared["html_output"] = exec_res # exec_res is the HTML string
+        
+        # 确保examples目录存在
+        examples_dir = os.path.join(os.getcwd(), "examples")
+        if not os.path.exists(examples_dir):
+            os.makedirs(examples_dir)
+            print(f"Created directory: {examples_dir}")
+        
+        # 从视频标题生成安全的文件名
+        video_title = shared.get("video_info", {}).get("title", "unknown_video")
+        
+        # 简单的文件名清理函数
+        def clean_filename(filename):
+            # 移除非法字符并将空格替换为下划线
+            return re.sub(r'[^\w\-_\. ]', '', filename).replace(' ', '_')[:200]
+        
+        safe_filename = clean_filename(video_title)
+        
+        # 如果文件名为空，使用默认名称
+        if not safe_filename:
+            safe_filename = "youtube_eli5_summary"
+        
+        # 添加.html扩展名
+        html_filename = f"{safe_filename}.html"
+        output_path = os.path.join(examples_dir, html_filename)
+        
+        # 保存HTML文件
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(exec_res)
+        
         print(f"Node: Stored HTML output (length: {len(shared['html_output'])} chars).")
+        print(f"Node: Saved HTML report to {output_path}")
+        
         return "default"
 
 # According to design.md, Content Processing is a subgraph containing ProcessTopic.
